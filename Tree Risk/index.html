@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VerdantRisk - Plant & Tree Safety ID</title>
+    <meta name="theme-color" content="#1f6f50" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="VerdantRisk" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <div class="hero-media" aria-hidden="true">
+          <div class="scan-frame">
+            <div class="tree-visual">
+              <span class="canopy canopy-a"></span>
+              <span class="canopy canopy-b"></span>
+              <span class="canopy canopy-c"></span>
+              <span class="trunk"></span>
+              <span class="root root-a"></span>
+              <span class="root root-b"></span>
+            </div>
+            <div class="example-tag">Example</div>
+            <div class="risk-tag">Moderate risk</div>
+          </div>
+        </div>
+        <div class="hero-copy">
+          <p class="eyebrow">Plant ID + safety assessment</p>
+          <h1>Identify Plants. Assess Risk.</h1>
+          <p>
+            Identify plants and trees, then check visible signs that could make
+            them a safety concern for people, property, pets, or public spaces.
+          </p>
+          <button class="primary-action" data-scroll-target="#scanner">
+            Identify & Check Risk
+          </button>
+        </div>
+      </section>
+
+      <section class="notice">
+        <strong>AI-assisted recommendation.</strong>
+        This result is based on submitted photos and available data. It may be
+        incorrect. For safety concerns, confirm with a licensed arborist or
+        qualified professional.
+      </section>
+
+      <section class="quick-tools" aria-label="App tools">
+        <button class="tool active" data-scroll-target="#scanner">
+          <strong>Identify</strong>
+          <span>Plant or tree ID</span>
+        </button>
+        <button class="tool" data-scroll-target="#scanner">
+          <strong>Safety</strong>
+          <span>Fall and hazard review</span>
+        </button>
+        <button class="tool" data-paywall>
+          <strong>Reports</strong>
+          <span>PDF and history</span>
+        </button>
+        <button class="tool" data-paywall>
+          <strong>Care</strong>
+          <span>Reminders and notes</span>
+        </button>
+      </section>
+
+      <section id="scanner" class="workspace">
+        <div class="panel scan-panel" id="scanPanel">
+          <div class="panel-heading">
+            <p class="eyebrow">Step 1</p>
+            <h2>Choose Scan Type</h2>
+          </div>
+
+          <div class="segmented" role="radiogroup" aria-label="Scan type">
+            <button class="active" data-scan-type="Tree">Tree</button>
+            <button data-scan-type="Plant">Plant</button>
+            <button data-scan-type="Shrub/Vine">Shrub/Vine</button>
+            <button data-scan-type="Not Sure">Not Sure</button>
+          </div>
+
+          <div class="panel-heading compact">
+            <p class="eyebrow">Step 2</p>
+            <h2>Add Photos</h2>
+          </div>
+          <p class="helper">
+            More pictures improve the assessment. Add what you can: full
+            plant/tree, leaf/needle detail, bark or stem, base/roots/soil,
+            canopy/branches, and close-up damage.
+          </p>
+          <p class="status-message" id="scanStatus">No photos added yet.</p>
+
+          <div class="photo-grid">
+            <label>
+              <span>Full view</span>
+              <input type="file" accept="image/*" capture="environment" data-photo="Full view" />
+            </label>
+            <label>
+              <span>Leaf/detail</span>
+              <input type="file" accept="image/*" capture="environment" data-photo="Leaf/detail" />
+            </label>
+            <label>
+              <span>Bark/stem</span>
+              <input type="file" accept="image/*" capture="environment" data-photo="Bark/stem" />
+            </label>
+            <label>
+              <span>Base/roots</span>
+              <input type="file" accept="image/*" capture="environment" data-photo="Base/roots" />
+            </label>
+            <label>
+              <span>Canopy/branches</span>
+              <input type="file" accept="image/*" capture="environment" data-photo="Canopy/branches" />
+            </label>
+            <label>
+              <span>Damage/decay</span>
+              <input type="file" accept="image/*" capture="environment" data-photo="Damage/decay" />
+            </label>
+          </div>
+
+          <div class="panel-heading compact">
+            <p class="eyebrow">Step 3</p>
+            <h2>Public Safety Context</h2>
+          </div>
+          <div class="chips" aria-label="Location context">
+            <button data-context="Near house">Near house</button>
+            <button data-context="Near sidewalk/road">Sidewalk/road</button>
+            <button data-context="Near power lines">Power lines</button>
+            <button data-context="Play or school area">Play area</button>
+            <button data-context="Near parking">Parking</button>
+            <button data-context="Open area">Open area</button>
+          </div>
+
+          <label class="toggle-row">
+            <input id="gpsToggle" type="checkbox" />
+            <span>Save GPS/map location for tracking</span>
+          </label>
+
+          <label class="text-field">
+            <span>Nearby address, optional but strongly recommended</span>
+            <input id="addressInput" type="text" placeholder="Example: 1200 Main St, Austin, TX" />
+          </label>
+
+          <button class="primary-action full" id="runScan">Run Assessment</button>
+        </div>
+
+        <div class="panel result-panel" id="resultPanel" hidden>
+          <div class="panel-heading">
+            <p class="eyebrow">Results</p>
+            <h2 id="resultTitle">Tree or woody plant: Moderate risk</h2>
+          </div>
+
+          <div class="result-group first">
+            <h3>Identification</h3>
+            <ul id="identificationSummary">
+              <li>Plant/tree identity will appear here after an assessment.</li>
+            </ul>
+          </div>
+
+          <div class="risk-meter" aria-label="Risk level">
+            <span class="level low">Low</span>
+            <span class="level moderate active">Moderate</span>
+            <span class="level high">High</span>
+            <span class="level critical">Critical</span>
+          </div>
+
+          <div class="quality-row">
+            <span>Assessment Quality</span>
+            <strong id="qualityLabel">Fair</strong>
+          </div>
+
+          <div class="result-group">
+            <h3>Observed Visual Indicators</h3>
+            <ul id="visualIndicators">
+              <li>Some canopy thinning or dead branch visibility</li>
+              <li>Possible trunk stress or cavity signs</li>
+              <li>Base/root view is limited</li>
+            </ul>
+          </div>
+
+          <div class="result-group">
+            <h3>Location/Public Safety Factors</h3>
+            <ul id="safetyFactors">
+              <li>No location context selected yet</li>
+            </ul>
+          </div>
+
+          <div class="result-group">
+            <h3>Other Hazard Flags</h3>
+            <ul>
+              <li>Check toxicity risk for children and pets</li>
+              <li>Check invasive, thorn, allergy, and root-damage risks</li>
+            </ul>
+          </div>
+
+          <p class="disclaimer">
+            This result is an AI-assisted recommendation based on submitted
+            photos and available data. It may be incorrect. For safety concerns,
+            confirm with a licensed arborist or qualified professional.
+          </p>
+
+          <div class="result-actions">
+            <button class="secondary-action" id="scanAgain">Scan Another</button>
+            <button class="secondary-action" data-paywall>Generate PDF Report</button>
+            <button class="secondary-action" data-paywall>Save to History</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="subscription">
+        <div>
+          <p class="eyebrow">Plans</p>
+          <h2>Choose how you want to assess plants and trees</h2>
+        </div>
+        <div class="pricing-grid">
+          <article class="pricing-card" tabindex="0" role="button" data-plan="Free">
+            <h3>Free</h3>
+            <p>Limited scans, basic plant/tree ID, basic risk level, and short hazard preview.</p>
+            <span>Current plan</span>
+          </article>
+          <article class="pricing-card featured" tabindex="0" role="button" data-plan="Pro">
+            <h3>Pro</h3>
+            <p>Unlimited scans, full hazard assessment, PDF reports, history, comparison over time, reminders, and map tracking.</p>
+            <span>Start trial</span>
+          </article>
+          <article class="pricing-card" tabindex="0" role="button" data-plan="Expert Review">
+            <h3>Expert Review</h3>
+            <p>Optional add-on for licensed arborist review when users want extra confirmation.</p>
+            <span>Coming soon</span>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal" id="paywall" aria-hidden="true">
+      <div class="paywall-card" role="dialog" aria-modal="true" aria-labelledby="paywallTitle">
+        <button class="close" id="closePaywall" aria-label="Close">×</button>
+        <p class="eyebrow">VerdantRisk Pro</p>
+        <h2 id="paywallTitle">Unlock full safety reports</h2>
+        <p>
+          Get unlimited scans, full indicator explanations, PDF reports, saved
+          history, photo comparison, reminders, and location tracking.
+        </p>
+        <div class="plans">
+          <button class="plan active">
+            <span>Annual</span>
+            <strong>$39.99/year</strong>
+            <small>Best value</small>
+          </button>
+          <button class="plan">
+            <span>Monthly</span>
+            <strong>$7.99/month</strong>
+            <small>Cancel anytime</small>
+          </button>
+        </div>
+        <button class="primary-action full">Start 7-Day Free Trial</button>
+        <p class="fine-print">Includes clear renewal pricing, restore purchase, Terms of Use, and Privacy Policy links for App Store review.</p>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

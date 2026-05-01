@@ -1,0 +1,19 @@
+{
+  "name": "VerdantRisk - Plant & Tree Safety ID",
+  "short_name": "VerdantRisk",
+  "description": "Identify plants and trees, then review visible safety concerns.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f4ed",
+  "theme_color": "#1f6f50",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
