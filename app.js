@@ -7,6 +7,7 @@ const identificationSummary = document.querySelector("#identificationSummary");
 const qualityLabel = document.querySelector("#qualityLabel");
 const visualIndicators = document.querySelector("#visualIndicators");
 const safetyFactors = document.querySelector("#safetyFactors");
+const hazardFlags = document.querySelector("#hazardFlags");
 const riskLevels = document.querySelectorAll(".level");
 const scanStatus = document.querySelector("#scanStatus");
 const resultPanel = document.querySelector(".result-panel");
@@ -25,54 +26,35 @@ const examples = {
   Tree: {
     name: "Tree or woody plant",
     identity: [
-      "Exact species identification needs the production AI plant ID engine connected.",
       "Best accuracy comes from leaf/needle detail, bark, full tree shape, flowers, fruit, cones, and location.",
-      "This prototype does not claim a species name from your photos yet."
+      "Species identification will appear here when the submitted photos return a confident match."
     ],
-    indicators: [
-      "Review full-tree lean, canopy dieback, dead branches, and branch attachment points",
-      "Review bark/stem photos for cracks, cavities, fungal growth, pests, or decay",
-      "Review base/root photos for root plate lifting, soil movement, girdling roots, or trunk flare damage"
-    ]
+    indicators: []
   },
   Plant: {
     name: "Plant",
     identity: [
-      "Exact species identification needs the production AI plant ID engine connected.",
       "Best accuracy comes from leaf shape, flowers, fruit, stem, growth habit, and location.",
-      "This prototype does not claim a species name from your photos yet."
+      "Species identification will appear here when the submitted photos return a confident match."
     ],
-    indicators: [
-      "Review possible toxicity, thorn, allergy, invasive, and contact-irritation risk",
-      "Review whether the plant is near children, pets, walkways, or public access",
-      "No tree fall-risk structure detected from current scan type"
-    ]
+    indicators: []
   },
   "Shrub/Vine": {
     name: "Shrub or vine",
     identity: [
-      "Exact species identification needs the production AI plant ID engine connected.",
       "Best accuracy comes from leaves, flowers, fruit, bark/stem texture, climbing pattern, and location.",
-      "This prototype does not claim a species name from your photos yet."
+      "Species identification will appear here when the submitted photos return a confident match."
     ],
-    indicators: [
-      "Review invasive spread, thorn, toxicity, allergy, and obstruction risk",
-      "Review whether vine growth is pulling on fences, gutters, railings, or utility areas",
-      "Close-up stem, attachment, and support photos improve the assessment"
-    ]
+    indicators: []
   },
   "Not Sure": {
     name: "Vegetation assessment",
     identity: [
-      "The production AI engine should first classify whether this is a tree, shrub, vine, weed, or other vegetation.",
+      "The app will first try to identify whether this is a tree, shrub, vine, weed, or other vegetation.",
       "Best accuracy comes from multiple angles and close-ups of leaves, bark/stem, flowers, fruit, cones, and the full subject.",
-      "This prototype does not claim a species name from your photos yet."
+      "Species identification will appear here when the submitted photos return a confident match."
     ],
-    indicators: [
-      "Visible hazard signs should be assessed separately from plant identity",
-      "If woody structure is present, review lean, dead limbs, trunk defects, and root plate condition",
-      "If non-woody vegetation is present, review toxicity, thorns, allergens, invasive risk, and public contact"
-    ]
+    indicators: []
   }
 };
 
@@ -127,17 +109,19 @@ runScanButton.addEventListener("click", async () => {
   const hasHighExposure = Array.from(selectedContexts).some((context) =>
     ["Near house", "Near sidewalk/road", "Near power lines", "Play or school area", "Near parking"].includes(context)
   );
-  const risk = chooseRisk(photoCount, hasHighExposure);
+  const photoTypes = getUploadedPhotoTypes();
+  const plantId = await identifyPlant();
+  const risk = chooseRisk(photoCount, hasHighExposure, photoTypes);
   const quality = chooseQuality(photoCount);
   const result = examples[selectedScanType];
-  const plantId = await identifyPlant();
   const resultName = plantId.primaryName || result.name;
 
   resultTitle.textContent = `${resultName}: ${risk} risk`;
   identificationSummary.innerHTML = buildIdentificationSummary(result, plantId);
   qualityLabel.textContent = quality;
-  visualIndicators.innerHTML = result.indicators.map((item) => `<li>${item}</li>`).join("");
+  visualIndicators.innerHTML = buildVisualIndicators(photoTypes, plantId);
   safetyFactors.innerHTML = buildSafetyFactors(hasHighExposure);
+  hazardFlags.innerHTML = buildHazardFlags(photoTypes, hasHighExposure, plantId);
   riskLevels.forEach((level) => level.classList.toggle("active", level.textContent === risk));
   scanStatus.textContent = plantId.statusMessage || `Assessment updated using ${photoCount} photo${photoCount === 1 ? "" : "s"}.`;
   scanStatus.classList.remove("needs-photo");
@@ -184,13 +168,17 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeModal();
 });
 
-function chooseRisk(photoCount, hasHighExposure) {
+function chooseRisk(photoCount, hasHighExposure, photoTypes) {
+  const hasDamagePhoto = photoTypes.has("Damage/decay");
+  const hasBasePhoto = photoTypes.has("Base/roots");
+  const hasCanopyPhoto = photoTypes.has("Canopy/branches");
+  const hasStructuralPhotos = hasBasePhoto && hasCanopyPhoto;
+
   if (selectedScanType === "Plant") return hasHighExposure ? "Moderate" : "Low";
-  if (photoCount <= 1 && hasHighExposure) return "High";
-  if (photoCount <= 1) return "Moderate";
-  if (photoCount >= 4 && hasHighExposure) return "Moderate";
-  if (photoCount >= 4) return "Low";
-  return hasHighExposure ? "High" : "Moderate";
+  if (hasDamagePhoto && hasHighExposure) return "High";
+  if (hasDamagePhoto) return "Moderate";
+  if (hasHighExposure && (!hasStructuralPhotos || photoCount <= 2)) return "Moderate";
+  return "Low";
 }
 
 function chooseQuality(photoCount) {
@@ -213,13 +201,87 @@ function buildSafetyFactors(hasHighExposure) {
   return mapped.join("");
 }
 
+function getUploadedPhotoTypes() {
+  return new Set(
+    Array.from(photoInputs)
+      .filter((input) => input.files.length > 0)
+      .map((input) => input.dataset.photo)
+  );
+}
+
+function buildVisualIndicators(photoTypes, plantId) {
+  const items = [];
+  const speciesName = plantId.primaryName || "the submitted plant/tree";
+
+  if (photoTypes.has("Full view")) {
+    items.push(`Full-view photo submitted for overall shape and clearance review of ${speciesName}.`);
+  } else {
+    items.push("No full-view photo submitted, so lean, overall shape, and clearance cannot be reviewed from the current photo set.");
+  }
+
+  if (photoTypes.has("Leaf/detail")) {
+    items.push("Leaf/detail photo submitted for species identification support.");
+  }
+
+  if (photoTypes.has("Bark/stem")) {
+    items.push("Bark/stem photo submitted for trunk or stem surface review.");
+  }
+
+  if (photoTypes.has("Base/roots")) {
+    items.push("Base/root photo submitted for root flare, soil movement, and trunk-base context.");
+  } else if (selectedScanType !== "Plant") {
+    items.push("No base/root photo submitted, so root plate lifting or trunk-base defects are not flagged from the current photos.");
+  }
+
+  if (photoTypes.has("Canopy/branches")) {
+    items.push("Canopy/branch photo submitted for branch structure and dead-limb review.");
+  } else if (selectedScanType !== "Plant") {
+    items.push("No canopy/branch photo submitted, so canopy dieback or dead-limb concerns are not flagged from the current photos.");
+  }
+
+  if (photoTypes.has("Damage/decay")) {
+    items.push("Damage/decay photo submitted. Treat any visible cracks, cavities, fungal growth, exposed rot, or broken limbs as reasons to confirm with a licensed arborist.");
+  } else {
+    items.push("No damage/decay photo submitted, so decay, disease, cracks, cavities, and broken-limb concerns are not flagged from the current photos.");
+  }
+
+  return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
+function buildHazardFlags(photoTypes, hasHighExposure, plantId) {
+  const flags = [];
+  const speciesName = plantId.primaryName || "this plant/tree";
+
+  if (selectedScanType === "Tree" || selectedScanType === "Not Sure") {
+    if (photoTypes.has("Damage/decay")) {
+      flags.push(`Possible structural concern to verify for ${speciesName} because a damage/decay photo was submitted.`);
+    } else {
+      flags.push("No structural damage flag is raised from the current photo set.");
+    }
+
+    if (hasHighExposure) {
+      flags.push("Public exposure selected. Even a low visual risk should be monitored more carefully near people, buildings, vehicles, roads, sidewalks, play areas, or utility lines.");
+    }
+  }
+
+  if (selectedScanType === "Plant" || selectedScanType === "Shrub/Vine" || selectedScanType === "Not Sure") {
+    flags.push("Check species-specific toxicity, thorn, allergy, invasive, and pet/child contact risks after confirming the identification.");
+  }
+
+  if (!flags.length) {
+    flags.push("No extra hazard flags are raised from the current inputs.");
+  }
+
+  flags.push("This is an AI-assisted recommendation from submitted photos and available data, not a licensed arborist inspection.");
+  return flags.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
 async function identifyPlant() {
   if (!plantIdEndpoint) {
     return {
       primaryName: "",
       statusMessage: "Assessment complete. Plant ID backend is not connected yet.",
       items: [
-        "Real species identification needs the secure backend endpoint configured.",
         "The safety assessment still uses photo count and selected public safety context.",
         "For best ID results, include leaf/needle detail, bark or stem, full view, flowers, fruit, or cones when available."
       ]
@@ -244,7 +306,7 @@ async function identifyPlant() {
     if (!response.ok) {
       return {
         primaryName: "",
-        statusMessage: `Plant ID failed with status ${response.status}. Check the secure backend configuration.`,
+        statusMessage: `Plant ID failed with status ${response.status}. Try again with clearer photos or check the connection.`,
         items: [
           "Pl@ntNet did not return an identification.",
           "Confirm the backend is deployed and its Pl@ntNet API secret is set.",
@@ -268,11 +330,22 @@ async function identifyPlant() {
 
     const primary = matches[0];
     const primaryName = formatSpeciesName(primary);
-    const items = [
-      `Likely species: ${primaryName}`,
-      `Identification strength: ${formatScore(primary.score)}`,
-      ...matches.slice(1).map((match) => `Alternative match: ${formatSpeciesName(match)} (${formatScore(match.score)})`)
-    ];
+    const items = primaryName
+      ? [
+          `Likely species: ${primaryName}`,
+          `Identification strength: ${formatScore(primary.score)}`,
+          ...matches
+            .slice(1)
+            .map((match) => {
+              const name = formatSpeciesName(match);
+              return name ? `Alternative match: ${name} (${formatScore(match.score)})` : "";
+            })
+            .filter(Boolean)
+        ]
+      : [
+          "No specific species name was returned.",
+          "Try again with clearer leaf, bark, flower, fruit, cone, and full-view photos."
+        ];
 
     return {
       primaryName,
@@ -282,7 +355,7 @@ async function identifyPlant() {
   } catch (error) {
     return {
       primaryName: "",
-      statusMessage: "Plant ID could not connect. Check internet access and the secure backend endpoint.",
+      statusMessage: "Plant ID could not connect. Check internet access and try again.",
       items: [
         "The app could not reach the plant ID backend from this browser.",
         "The hazard assessment below is still a recommendation based on submitted photos and location context.",
@@ -309,6 +382,7 @@ function formatSpeciesName(match) {
   const species = match?.species || {};
   const scientificName = species.scientificNameWithoutAuthor || species.scientificName || "Unknown species";
   const commonNames = Array.isArray(species.commonNames) ? species.commonNames.filter(Boolean) : [];
+  if (scientificName === "Unknown species" && !commonNames.length) return "";
   return commonNames.length ? `${commonNames[0]} (${scientificName})` : scientificName;
 }
 
