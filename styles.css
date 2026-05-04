@@ -500,18 +500,6 @@ h3 {
   background: #fbfcfa;
 }
 
-.api-setup {
-  margin-top: 22px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfcfa;
-}
-
-.api-setup .text-field {
-  margin-top: 12px;
-}
-
 .scan-panel .primary-action {
   margin-top: 22px;
 }

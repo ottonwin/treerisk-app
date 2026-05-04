@@ -16,8 +16,7 @@ const scanAgainButton = document.querySelector("#scanAgain");
 const paywall = document.querySelector("#paywall");
 const closePaywall = document.querySelector("#closePaywall");
 const pricingCards = document.querySelectorAll("[data-plan]");
-const plantnetKeyInput = document.querySelector("#plantnetKey");
-const saveApiKeyInput = document.querySelector("#saveApiKey");
+const plantIdEndpoint = window.TREERISK_PLANT_ID_ENDPOINT || "";
 
 let selectedScanType = "Tree";
 let selectedContexts = new Set();
@@ -111,11 +110,6 @@ photoInputs.forEach((input) => {
     updateScanStatus();
   });
 });
-
-const savedPlantnetKey = localStorage.getItem("plantnetApiKey");
-if (savedPlantnetKey) {
-  plantnetKeyInput.value = savedPlantnetKey;
-}
 
 runScanButton.addEventListener("click", async () => {
   const photoCount = Array.from(photoInputs).filter((input) => input.files.length > 0).length;
@@ -220,23 +214,16 @@ function buildSafetyFactors(hasHighExposure) {
 }
 
 async function identifyPlant() {
-  const apiKey = plantnetKeyInput.value.trim();
-  if (!apiKey) {
+  if (!plantIdEndpoint) {
     return {
       primaryName: "",
-      statusMessage: "Assessment complete. Add a Pl@ntNet API key to get real plant/tree species identification.",
+      statusMessage: "Assessment complete. Plant ID backend is not connected yet.",
       items: [
-        "Real species identification is not connected until a Pl@ntNet API key is entered.",
+        "Real species identification needs the secure backend endpoint configured.",
         "The safety assessment still uses photo count and selected public safety context.",
         "For best ID results, include leaf/needle detail, bark or stem, full view, flowers, fruit, or cones when available."
       ]
     };
-  }
-
-  if (saveApiKeyInput.checked) {
-    localStorage.setItem("plantnetApiKey", apiKey);
-  } else {
-    localStorage.removeItem("plantnetApiKey");
   }
 
   const files = Array.from(photoInputs)
@@ -249,7 +236,7 @@ async function identifyPlant() {
   });
 
   try {
-    const response = await fetch(`https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(apiKey)}`, {
+    const response = await fetch(plantIdEndpoint, {
       method: "POST",
       body: formData
     });
@@ -257,10 +244,10 @@ async function identifyPlant() {
     if (!response.ok) {
       return {
         primaryName: "",
-        statusMessage: `Plant ID failed with status ${response.status}. Check the API key and authorized domain settings.`,
+        statusMessage: `Plant ID failed with status ${response.status}. Check the secure backend configuration.`,
         items: [
           "Pl@ntNet did not return an identification.",
-          "Confirm your key is active and the GitHub Pages domain is authorized if domain restrictions are enabled.",
+          "Confirm the backend is deployed and its Pl@ntNet API secret is set.",
           "The hazard assessment below is still a recommendation based on submitted photos and location context."
         ]
       };
@@ -295,11 +282,11 @@ async function identifyPlant() {
   } catch (error) {
     return {
       primaryName: "",
-      statusMessage: "Plant ID could not connect. Check internet access, API key, and Pl@ntNet domain settings.",
+      statusMessage: "Plant ID could not connect. Check internet access and the secure backend endpoint.",
       items: [
-        "The app could not reach Pl@ntNet from this browser.",
+        "The app could not reach the plant ID backend from this browser.",
         "The hazard assessment below is still a recommendation based on submitted photos and location context.",
-        "For production, this API request should go through a secure backend instead of exposing a browser key."
+        "The API key is intentionally not stored in public app code."
       ]
     };
   }
