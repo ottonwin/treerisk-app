@@ -16,6 +16,8 @@ const scanAgainButton = document.querySelector("#scanAgain");
 const paywall = document.querySelector("#paywall");
 const closePaywall = document.querySelector("#closePaywall");
 const pricingCards = document.querySelectorAll("[data-plan]");
+const plantnetKeyInput = document.querySelector("#plantnetKey");
+const saveApiKeyInput = document.querySelector("#saveApiKey");
 
 let selectedScanType = "Tree";
 let selectedContexts = new Set();
@@ -110,7 +112,12 @@ photoInputs.forEach((input) => {
   });
 });
 
-runScanButton.addEventListener("click", () => {
+const savedPlantnetKey = localStorage.getItem("plantnetApiKey");
+if (savedPlantnetKey) {
+  plantnetKeyInput.value = savedPlantnetKey;
+}
+
+runScanButton.addEventListener("click", async () => {
   const photoCount = Array.from(photoInputs).filter((input) => input.files.length > 0).length;
   if (!photoCount) {
     scanStatus.textContent = "Add at least one photo before running an assessment.";
@@ -118,20 +125,27 @@ runScanButton.addEventListener("click", () => {
     return;
   }
 
+  runScanButton.disabled = true;
+  runScanButton.textContent = "Analyzing...";
+  scanStatus.textContent = "Analyzing photos and checking plant ID...";
+  scanStatus.classList.remove("needs-photo");
+
   const hasHighExposure = Array.from(selectedContexts).some((context) =>
     ["Near house", "Near sidewalk/road", "Near power lines", "Play or school area", "Near parking"].includes(context)
   );
   const risk = chooseRisk(photoCount, hasHighExposure);
   const quality = chooseQuality(photoCount);
   const result = examples[selectedScanType];
+  const plantId = await identifyPlant();
+  const resultName = plantId.primaryName || result.name;
 
-  resultTitle.textContent = `${result.name}: ${risk} risk`;
-  identificationSummary.innerHTML = result.identity.map((item) => `<li>${item}</li>`).join("");
+  resultTitle.textContent = `${resultName}: ${risk} risk`;
+  identificationSummary.innerHTML = buildIdentificationSummary(result, plantId);
   qualityLabel.textContent = quality;
   visualIndicators.innerHTML = result.indicators.map((item) => `<li>${item}</li>`).join("");
   safetyFactors.innerHTML = buildSafetyFactors(hasHighExposure);
   riskLevels.forEach((level) => level.classList.toggle("active", level.textContent === risk));
-  scanStatus.textContent = `Assessment updated using ${photoCount} photo${photoCount === 1 ? "" : "s"}.`;
+  scanStatus.textContent = plantId.statusMessage || `Assessment updated using ${photoCount} photo${photoCount === 1 ? "" : "s"}.`;
   scanStatus.classList.remove("needs-photo");
   resultPanel.classList.remove("updated");
   resultPanel.hidden = false;
@@ -140,6 +154,8 @@ runScanButton.addEventListener("click", () => {
   void resultPanel.offsetWidth;
   resultPanel.classList.add("updated");
   resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  runScanButton.disabled = false;
+  runScanButton.textContent = "Run Assessment";
 });
 
 scanAgainButton.addEventListener("click", () => {
@@ -201,6 +217,128 @@ function buildSafetyFactors(hasHighExposure) {
   }
 
   return mapped.join("");
+}
+
+async function identifyPlant() {
+  const apiKey = plantnetKeyInput.value.trim();
+  if (!apiKey) {
+    return {
+      primaryName: "",
+      statusMessage: "Assessment complete. Add a Pl@ntNet API key to get real plant/tree species identification.",
+      items: [
+        "Real species identification is not connected until a Pl@ntNet API key is entered.",
+        "The safety assessment still uses photo count and selected public safety context.",
+        "For best ID results, include leaf/needle detail, bark or stem, full view, flowers, fruit, or cones when available."
+      ]
+    };
+  }
+
+  if (saveApiKeyInput.checked) {
+    localStorage.setItem("plantnetApiKey", apiKey);
+  } else {
+    localStorage.removeItem("plantnetApiKey");
+  }
+
+  const files = Array.from(photoInputs)
+    .filter((input) => input.files.length > 0)
+    .slice(0, 5);
+  const formData = new FormData();
+  files.forEach((input) => {
+    formData.append("images", input.files[0]);
+    formData.append("organs", mapPhotoToOrgan(input.dataset.photo));
+  });
+
+  try {
+    const response = await fetch(`https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      body: formData
+    });
+
+    if (!response.ok) {
+      return {
+        primaryName: "",
+        statusMessage: `Plant ID failed with status ${response.status}. Check the API key and authorized domain settings.`,
+        items: [
+          "Pl@ntNet did not return an identification.",
+          "Confirm your key is active and the GitHub Pages domain is authorized if domain restrictions are enabled.",
+          "The hazard assessment below is still a recommendation based on submitted photos and location context."
+        ]
+      };
+    }
+
+    const data = await response.json();
+    const matches = Array.isArray(data.results) ? data.results.slice(0, 3) : [];
+    if (!matches.length) {
+      return {
+        primaryName: "",
+        statusMessage: "Plant ID returned no confident match. Add clearer leaf, bark, flower, fruit, or full-view photos.",
+        items: [
+          "No likely species match was returned.",
+          "Try again with better lighting and close-ups of leaves, bark/stem, flowers, fruit, cones, and the full plant/tree."
+        ]
+      };
+    }
+
+    const primary = matches[0];
+    const primaryName = formatSpeciesName(primary);
+    const items = [
+      `Likely species: ${primaryName}`,
+      `Identification strength: ${formatScore(primary.score)}`,
+      ...matches.slice(1).map((match) => `Alternative match: ${formatSpeciesName(match)} (${formatScore(match.score)})`)
+    ];
+
+    return {
+      primaryName,
+      statusMessage: `Plant ID complete using ${files.length} photo${files.length === 1 ? "" : "s"}.`,
+      items
+    };
+  } catch (error) {
+    return {
+      primaryName: "",
+      statusMessage: "Plant ID could not connect. Check internet access, API key, and Pl@ntNet domain settings.",
+      items: [
+        "The app could not reach Pl@ntNet from this browser.",
+        "The hazard assessment below is still a recommendation based on submitted photos and location context.",
+        "For production, this API request should go through a secure backend instead of exposing a browser key."
+      ]
+    };
+  }
+}
+
+function buildIdentificationSummary(fallbackResult, plantId) {
+  const items = plantId.items && plantId.items.length ? plantId.items : fallbackResult.identity;
+  return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
+function mapPhotoToOrgan(photoType) {
+  if (photoType === "Leaf/detail") return "leaf";
+  if (photoType === "Bark/stem") return "bark";
+  if (photoType === "Canopy/branches") return "leaf";
+  if (photoType === "Damage/decay") return "bark";
+  return "auto";
+}
+
+function formatSpeciesName(match) {
+  const species = match?.species || {};
+  const scientificName = species.scientificNameWithoutAuthor || species.scientificName || "Unknown species";
+  const commonNames = Array.isArray(species.commonNames) ? species.commonNames.filter(Boolean) : [];
+  return commonNames.length ? `${commonNames[0]} (${scientificName})` : scientificName;
+}
+
+function formatScore(score) {
+  if (typeof score !== "number") return "available, but not scored";
+  if (score >= 0.65) return "Strong";
+  if (score >= 0.35) return "Fair";
+  return "Limited";
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function closeModal() {

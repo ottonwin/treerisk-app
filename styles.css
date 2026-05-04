@@ -74,6 +74,24 @@ button {
   border-radius: 8px;
 }
 
+.photo-example {
+  background: #dfe8dc;
+  overflow: hidden;
+}
+
+.photo-example::before,
+.photo-example::after {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.example-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .scan-frame::before,
 .scan-frame::after {
   content: "";
@@ -482,6 +500,18 @@ h3 {
   background: #fbfcfa;
 }
 
+.api-setup {
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.api-setup .text-field {
+  margin-top: 12px;
+}
+
 .scan-panel .primary-action {
   margin-top: 22px;
 }
@@ -738,21 +768,4 @@ h3 {
   .photo-grid label {
     min-height: 90px;
   }
-}.photo-example {
-  background: #dfe8dc;
-  overflow: hidden;
 }
-
-.photo-example::before,
-.photo-example::after {
-  z-index: 2;
-  pointer-events: none;
-}
-
-.example-photo {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-

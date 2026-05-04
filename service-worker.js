@@ -6,6 +6,7 @@ const APP_ASSETS = [
   "./app.js",
   "./manifest.json",
   "./icon.svg",
+  "./example-tree.jpeg",
   "./offline.html"
 ];
 
